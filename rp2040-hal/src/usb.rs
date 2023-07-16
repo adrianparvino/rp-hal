@@ -141,7 +141,7 @@ impl Endpoint {
             (DPRAM_BASE.offset(0x100), self.max_packet_size as usize)
         } else {
             (
-                DPRAM_BASE.offset(0x180 + (self.buffer_offset * 64) as isize),
+                DPRAM_BASE.offset(self.buffer_offset as isize),
                 self.max_packet_size as usize,
             )
         }
@@ -183,7 +183,7 @@ impl Inner {
             ctrl_dpram,
             in_endpoints: Default::default(),
             out_endpoints: Default::default(),
-            next_offset: 0,
+            next_offset: 0x180,
             read_setup: false,
             #[cfg(feature = "rp2040-e5")]
             errata5_state: None,
@@ -252,8 +252,8 @@ impl Inner {
             // size in 64bytes units.
             // NOTE: the compiler is smart enough to recognize /64 as a 6bit right shift so let's
             // keep the division here for the sake of clarity
-            let aligned_sized = (max_packet_size + 63) / 64;
-            if (self.next_offset + aligned_sized) > (4096 / 64) {
+            let aligned_sized = (max_packet_size + 63) / 64 * 64;
+            if (self.next_offset + aligned_sized) > 4096 {
                 return Err(UsbError::EndpointMemoryOverflow);
             }
 
@@ -299,7 +299,7 @@ impl Inner {
                 w.endpoint_type().variant(ep_type);
                 w.interrupt_per_buff().set_bit();
                 w.enable().set_bit();
-                w.buffer_address().bits(0x180 + (ep.buffer_offset << 6))
+                w.buffer_address().bits(ep.buffer_offset)
             });
             // reset OUT ep and prepare IN ep to accept data
             let buf_control = &self.ctrl_dpram.ep_buffer_control[index + 2];
